@@ -148,3 +148,33 @@ DIFF_BYTES_PROLOGUE
     DIFF_BYTES_BODY    u, u
 %undef i
 %endif
+
+; void ff_sub_hfyu_median_pred_core_mmxext(uint8_t *dst, const uint8_t *src1,
+;                                          const uint8_t *src2, int w)
+; TODO: sse2?
+INIT_MMX mmxext
+cglobal sub_hfyu_median_pred_core, 4,5,6, dst, src1, src2, w, i
+; FIXME: make w intptr_t
+    movsxdifnidn  wq, wd
+    xor           iq, iq
+    movu          m0, [src1q]         ; LT
+    LSHIFT        m0, 1
+.loop:
+    movu          m1, [src1q + iq]    ; T
+    movu          m2, [src2q + iq - 1]; L
+    movu          m3, [src2q + iq]    ; X
+    mova          m4, m2              ; L
+    psubb         m2, m0              ; LT - L
+    paddb         m2, m1              ; L + T - LT
+    mova          m5, m4              ; L
+    pmaxub        m4, m1              ; max(T, L)
+    pminub        m1, m5              ; min(T, L)
+    pminub        m4, m2              ; min(max(T, L), L + T - LT)
+    pmaxub        m4, m1              ; pred = max(min(max(T, L), L + T - LT), min(T, L))
+    psubb         m3, m4              ; dst - pred
+    movu [dstq + iq], m3
+    add           iq, 8
+    movu          m0, [src1q + iq - 1]
+    cmp           iq, wq
+        jb     .loop
+    REP_RET
