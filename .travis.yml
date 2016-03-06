@@ -2,25 +2,30 @@ language: c
 sudo: false
 os:
   - linux
-  - osx
+compiler:
+  - clang
+matrix:
+  exclude:
+    - os: osx
+      compiler: gcc
 addons:
   apt:
     packages:
       - yasm
       - diffutils
-compiler:
-  - clang
-  - gcc
 cache:
   directories:
     - ffmpeg-samples
 before_install:
+  - git fetch --depth=1000000
+  - openssl aes-256-cbc -K $encrypted_9601c2dd51ac_key -iv $encrypted_9601c2dd51ac_iv
+    -in .travis/ssh_key.enc -out .travis/ssh_key -d
   - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew update --all; fi
 install:
   - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install yasm; fi
 script:
   - mkdir -p ffmpeg-samples
-  - ./configure --samples=ffmpeg-samples --cc=$CC
-  - make -j 8
-  - make fate-rsync
-  - make check -j 8
+  - rsync -vrltLW --timeout=60 rsync://fate-suite.ffmpeg.org/fate-suite/ ffmpeg-samples
+  - cp -a .travis $HOME/ffmpeg-travis
+  - git reset --hard HEAD^
+  - sh $HOME/ffmpeg-travis/fate.sh $HOME/ffmpeg-travis/fate_config.sh
